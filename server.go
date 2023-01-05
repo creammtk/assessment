@@ -59,6 +59,23 @@ func getUserHandler(c echo.Context) error {
 	}
 }
 
+func updateUserHandler(c echo.Context) error {
+	id := c.Param("id")
+	exp := Expense{}
+	err := c.Bind(&exp)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: "can't prepare query user statment:" + err.Error()})
+	}
+
+	row := db.QueryRow("UPDATE expenses SET title=$2, amount=$3, note=$4, tags=$5 WHERE id=$1 RETURNING id, title, amount, note, tags", id, exp.Title, exp.Amount, exp.Note, pq.Array(exp.Tags))
+
+	err = row.Scan(&exp.ID, &exp.Title, &exp.Amount, &exp.Note, pq.Array(&exp.Tags))
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: "can't update:" + err.Error()})
+	}
+	return c.JSON(http.StatusOK, exp)
+}
+
 var db *sql.DB
 
 func main() {
@@ -89,6 +106,7 @@ func main() {
 
 	e.POST("/expenses", createUserHandler)
 	e.GET("/expenses/:id", getUserHandler)
+	e.PUT("/expenses/:id", updateUserHandler)
 
 	fmt.Println("Please use server.go for main file")
 	fmt.Println("start at port:", os.Getenv("PORT"))
