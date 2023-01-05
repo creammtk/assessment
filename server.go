@@ -76,6 +76,31 @@ func updateUserHandler(c echo.Context) error {
 	return c.JSON(http.StatusOK, exp)
 }
 
+func getUsersHandler(c echo.Context) error {
+	stmt, err := db.Prepare("SELECT id, title, amount, note, tags FROM expenses")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: "can't prepare query all users statment:" + err.Error()})
+	}
+
+	rows, err := stmt.Query()
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: "can't query all users:" + err.Error()})
+	}
+
+	expense := []Expense{}
+
+	for rows.Next() {
+		exp := Expense{}
+		err = rows.Scan(&exp.ID, &exp.Title, &exp.Amount, &exp.Note, pq.Array(&exp.Tags))
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, Err{Message: "can't scan user:" + err.Error()})
+		}
+		expense = append(expense, exp)
+	}
+
+	return c.JSON(http.StatusOK, expense)
+}
+
 var db *sql.DB
 
 func main() {
@@ -107,6 +132,7 @@ func main() {
 	e.POST("/expenses", createUserHandler)
 	e.GET("/expenses/:id", getUserHandler)
 	e.PUT("/expenses/:id", updateUserHandler)
+	e.GET("/expenses", getUsersHandler)
 
 	fmt.Println("Please use server.go for main file")
 	fmt.Println("start at port:", os.Getenv("PORT"))
