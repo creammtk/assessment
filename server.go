@@ -4,9 +4,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
-	_ "github.com/labstack/echo/v4/middleware"
+	"github.com/labstack/echo"
+	"github.com/lib/pq"
 	_ "github.com/lib/pq"
 )
 
@@ -20,6 +22,21 @@ type Expense struct {
 	Amount float64  `json:"amount"`
 	Note   string   `json:"note"`
 	Tags   []string `json:"tags"`
+}
+
+func createUserHandler(c echo.Context) error {
+	exp := Expense{}
+	err := c.Bind(&exp)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, Err{Message: err.Error()})
+	}
+	row := db.QueryRow("INSERT INTO expenses (title, amount, note, tags) values ($1, $2, $3, $4)  RETURNING id", exp.Title, exp.Amount, exp.Note, pq.Array(exp.Tags))
+	err = row.Scan(&exp.ID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, Err{Message: err.Error()})
+	}
+
+	return c.JSON(http.StatusCreated, exp)
 }
 
 var db *sql.DB
@@ -46,8 +63,13 @@ func main() {
 		log.Fatal("Cannot create table")
 		return
 	}
-	log.Println("Create Sucess")
+	log.Println("Create Success")
+
+	e := echo.New()
+
+	e.POST("/expenses", createUserHandler)
 
 	fmt.Println("Please use server.go for main file")
 	fmt.Println("start at port:", os.Getenv("PORT"))
+	log.Fatal(e.Start(os.Getenv("PORT")))
 }
